@@ -129,7 +129,7 @@ def is_output_for_store(env, store, type):
         result = read_file(directoryOutput + "/" + nameOutput)
     else:
         # create file
-        header = ["entity_id", "error_type"]
+        header = ["entity_id", "error_type", "back_url", "front_url"]
         create_file(directoryOutput + "/" + nameOutput)
         append_file(directoryOutput + "/" + nameOutput, header)
         result = ""
@@ -251,8 +251,9 @@ def worker(env, store, i, tabs_uri):
             try:
                 entity_id = str(uri[0])
                 entity_uri = str(uri[1])
+                front_url = domain + entity_uri
 
-                driver.get(domain + entity_uri)
+                driver.get(front_url)
                 time.sleep(0.8)
 
                 is_cms404 = True
@@ -320,6 +321,11 @@ def worker(env, store, i, tabs_uri):
             except Exception as e:
                 print(f"Process {num}_{name}_{i} : Une erreur sur {entity_id} - {e}")
             finally:
+                back_url = (
+                    str(os.environ.get("DOMAINE_ADMIN_URL"))
+                    + "catalog/product/edit/id/"
+                    + entity_id
+                )
                 if is_cms404 == True or is_error == True:
                     type_error = (
                         "The product is KPUT, 404 (diabled, not visible, other)"
@@ -327,7 +333,7 @@ def worker(env, store, i, tabs_uri):
                     is_output_for_store(env, store, 0)
                     append_file(
                         get_directory_output(env) + "/" + get_file_output(store, 0),
-                        [entity_id, type_error],
+                        [entity_id, type_error, back_url, front_url],
                     )
                     message = " should be KPUT by 404 (diabled, not visible, other)"
                 else:
@@ -338,15 +344,16 @@ def worker(env, store, i, tabs_uri):
                         is_output_for_store(env, store, 1)
                         append_file(
                             get_directory_output(env) + "/" + get_file_output(store, 1),
-                            [entity_id, type_error],
+                            [entity_id, type_error, back_url, front_url],
                         )
                         message = " should be KPUT by 3 columns"
                     if is_translucent == True:
                         type_error = "The product has a translucent background image"
+
                         is_output_for_store(env, store, 2)
                         append_file(
                             get_directory_output(env) + "/" + get_file_output(store, 2),
-                            [entity_id, type_error],
+                            [entity_id, type_error, back_url, front_url],
                         )
                         message = " should be KPUT by translucent image"
 
