@@ -16,6 +16,7 @@ import outils
 
 
 def get_store_to_parse(env, store_selected):
+    #  TODO: Bug: quand il y a plusieurs store seule le premier est retourné par la requete alors que quand on l'execute en bdd il y a biens tout les stores demandé
     if store_selected == "0":
         query = (
             "SELECT store_id, store.code, store.name, store.website_id, store_website.name as domaine"
@@ -31,7 +32,7 @@ def get_store_to_parse(env, store_selected):
             + " INNER JOIN store_website on store.website_id = store_website.website_id"
             + " WHERE store_id NOT IN (%s) AND store_id IN (%s)"
         )
-        data = str(os.environ.get("EXCLUDE_STORE"), str(store_selected))
+        data = (str(os.environ.get("EXCLUDE_STORE")), str(store_selected))
 
     datas = outils.recuperer_donnees_bdd_distante(env, query, data)
 
@@ -65,17 +66,15 @@ def get_uri_from_store(env, store_selected, treated):
             + " AND ur.store_id NOT IN (%s)"
             + " AND ur.store_id IN (%s)"
             + " AND cpe.entity_id NOT IN (SELECT child_id FROM catalog_product_relation)"
-            + " AND ur.request_path not like '%"
-            + "%s"
-            + "%'"
+            + " AND ur.request_path not like %s"
             + " AND cpe.type_id != 'grouped'"
             + " GROUP BY cpe.entity_id"
             + " ORDER BY cpe.entity_id"
         )
-        data = str(
+        data = (
             str(os.environ.get("EXCLUDE_STORE")),
             str(store_selected[0]),
-            str(os.environ.get("EXCLUDE_URI")),
+            f"%{str(os.environ.get("EXCLUDE_URI"))}%"
         )
     else:
         requete = (
@@ -87,19 +86,18 @@ def get_uri_from_store(env, store_selected, treated):
             + " AND ur.store_id NOT IN (%s)"
             + " AND ur.store_id IN (%s)"
             + " AND cpe.entity_id NOT IN (SELECT child_id FROM catalog_product_relation)"
-            + " AND ur.request_path not like '%"
-            + "%s"
-            + "%'"
+            + " AND ur.request_path not like %s"
             + " AND cpe.type_id != 'grouped'"
             + " GROUP BY cpe.entity_id"
             + " ORDER BY cpe.entity_id"
         )
-        data = str(
+        data = (
             ", ".join(treated),
             str(os.environ.get("EXCLUDE_STORE")),
             str(store_selected[0]),
-            str(os.environ.get("EXCLUDE_URI")),
+            f"%{str(os.environ.get("EXCLUDE_URI"))}%",
         )
+        
 
     datas = outils.recuperer_donnees_bdd_distante(env, requete, data)
 
