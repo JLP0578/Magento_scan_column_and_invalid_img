@@ -53,6 +53,7 @@ Si le script trouve une erreur, il va générer un fichier dans `output`, il vou
 | `LOCAL_DATABASES` | **Nom de la base**<br /> de la base de données du local |
 | `EXCLUDE_STORE`   | **ID** des store a exclure (ex :`"0, 3, 5"`)             |
 | `EXCLUDE_URI`     | **URI** des URI a exclure (ex :`"pieces-"`)              |
+| `DOMAINE_ADMIN_URL`| **URL** du domaine admin pour faire un racoursi sur la page de modification du produit|
 
 ## Quelles seraient les vulnérabilités de l'outil ?
 
