@@ -17,27 +17,23 @@ import outils
 
 def get_store_to_parse(env, store_selected):
     if store_selected == "0":
-        requete = (
+        query = (
             "SELECT store_id, store.code, store.name, store.website_id, store_website.name as domaine"
             + " FROM store"
             + " INNER JOIN store_website on store.website_id = store_website.website_id"
-            + " WHERE store_id NOT IN ("
-            + os.environ.get("EXCLUDE_STORE")
-            + ")"
+            + " WHERE store_id NOT IN (%s)"
         )
+        data = str(os.environ.get("EXCLUDE_STORE"))
     else:
-        requete = (
+        query = (
             "SELECT store_id, store.code, store.name, store.website_id, store_website.name as domaine"
             + " FROM store"
             + " INNER JOIN store_website on store.website_id = store_website.website_id"
-            + " WHERE store_id NOT IN ("
-            + os.environ.get("EXCLUDE_STORE")
-            + ") AND store_id IN ("
-            + store_selected
-            + ")"
+            + " WHERE store_id NOT IN (%s) AND store_id IN (%s)"
         )
+        data = str(os.environ.get("EXCLUDE_STORE"), str(store_selected))
 
-    datas = outils.recuperer_donnees_bdd_distante(env, requete)
+    datas = outils.recuperer_donnees_bdd_distante(env, query, data)
 
     return datas
 
@@ -66,19 +62,20 @@ def get_uri_from_store(env, store_selected, treated):
             + " FROM catalog_product_entity cpe"
             + " INNER JOIN url_rewrite ur on cpe.entity_id = ur.entity_id"
             + ' WHERE ur.entity_type = "product"'
-            + " AND ur.store_id NOT IN ("
-            + os.environ.get("EXCLUDE_STORE")
-            + ")"
-            + " AND ur.store_id IN ("
-            + str(store_selected[0])
-            + ")"
+            + " AND ur.store_id NOT IN (%s)"
+            + " AND ur.store_id IN (%s)"
             + " AND cpe.entity_id NOT IN (SELECT child_id FROM catalog_product_relation)"
             + " AND ur.request_path not like '%"
-            + os.environ.get("EXCLUDE_URI")
+            + "%s"
             + "%'"
             + " AND cpe.type_id != 'grouped'"
             + " GROUP BY cpe.entity_id"
             + " ORDER BY cpe.entity_id"
+        )
+        data = str(
+            str(os.environ.get("EXCLUDE_STORE")),
+            str(store_selected[0]),
+            str(os.environ.get("EXCLUDE_URI")),
         )
     else:
         requete = (
@@ -86,25 +83,25 @@ def get_uri_from_store(env, store_selected, treated):
             + " FROM catalog_product_entity cpe"
             + " INNER JOIN url_rewrite ur on cpe.entity_id = ur.entity_id"
             + ' WHERE ur.entity_type = "product"'
-            + " AND cpe.entity_id NOT IN ("
-            + ", ".join(treated)
-            + ")"
-            + " AND ur.store_id NOT IN ("
-            + os.environ.get("EXCLUDE_STORE")
-            + ")"
-            + " AND ur.store_id IN ("
-            + str(store_selected[0])
-            + ")"
+            + " AND cpe.entity_id NOT IN (%s)"
+            + " AND ur.store_id NOT IN (%s)"
+            + " AND ur.store_id IN (%s)"
             + " AND cpe.entity_id NOT IN (SELECT child_id FROM catalog_product_relation)"
             + " AND ur.request_path not like '%"
-            + +os.environ.get("EXCLUDE_URI")
+            + "%s"
             + "%'"
             + " AND cpe.type_id != 'grouped'"
             + " GROUP BY cpe.entity_id"
             + " ORDER BY cpe.entity_id"
         )
+        data = str(
+            ", ".join(treated),
+            str(os.environ.get("EXCLUDE_STORE")),
+            str(store_selected[0]),
+            str(os.environ.get("EXCLUDE_URI")),
+        )
 
-    datas = outils.recuperer_donnees_bdd_distante(env, requete)
+    datas = outils.recuperer_donnees_bdd_distante(env, requete, data)
 
     return datas
 
