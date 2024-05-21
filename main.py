@@ -1,6 +1,28 @@
 #  External
 from datetime import datetime
 import multiprocessing
+import argparse
+
+parser = argparse.ArgumentParser(
+    description="Scanner de produits simple Magento pour les images transparente, les produits 3 colonnes, les pages 404."
+)
+parser.add_argument(
+    "--env",
+    type=str,
+    default="dev",
+    help="L'environement à utiliser (ex: prod) [prod, dev, local]",
+)
+parser.add_argument(
+    "--stores", type=str, help="Quels stores sont à scanner (ex:  1, 5, 8)"
+)
+parser.add_argument(
+    "--nb_processing",
+    type=int,
+    default=4,
+    nargs="?",
+    help="Quels est le nombre de process (ex: 4)",
+)
+args = parser.parse_args()
 
 # doenv
 from os.path import join, dirname
@@ -15,16 +37,11 @@ import function
 
 def main():
     if __name__ == "__main__":
-        start = datetime.now()
-        env = input("Quel est l'environnement a utiliser ? prod, dev(defaut), local : ")
-        if not env:
-            env = "dev"
-        store_selected = input("Quel est le store ciblé (un a la fois)? : ")
-        if not store_selected:
-            print("Vous devez choisir un store.")
-        # TODO: input for nb_part
-        nb_part = 4
+        env = args.env
+        store_selected = args.stores
+        nb_part = args.nb_processing
 
+        start = datetime.now()
         stores = function.get_store_to_parse(env, store_selected)
         for store in stores:
             treated = function.get_treated_elements(env, store)
@@ -34,18 +51,18 @@ def main():
             tabs_uri = function.split_array_equally(uri, nb_part)
 
             # Initialiser les queues
-            multiprocessingMonitor = multiprocessing.Queue()
+            multiprocessing.Queue()
             processus = []
             try:
                 for i in range(nb_part):
-                    if len(tabs_uri) > 0:
+                    if len(tabs_uri) > 0 and len(tabs_uri[i]) > 0:
                         p = multiprocessing.Process(
                             target=outils.worker, args=(env, store, i, tabs_uri[i])
                         )
                         processus.append(p)
                         p.start()
                     else:
-                        print("[ERREUR] Pas de URI à traiter")
+                        print("[INFO] Pas de URI à traiter")
                 print("[INFO] Tous les processus ont terminé.")
 
             except Exception as e:
