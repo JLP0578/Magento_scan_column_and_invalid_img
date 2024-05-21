@@ -49,7 +49,7 @@ def has_transparent_background_from_url(image_url):
         return False
 
 
-def recuperer_donnees_bdd_distante(env, requete_sql):
+def recuperer_donnees_bdd_distante(env, requete_sql, data_sql):
     try:
         if env == "prod":
             connexion = mysql.connector.connect(
@@ -75,7 +75,7 @@ def recuperer_donnees_bdd_distante(env, requete_sql):
 
         curseur = connexion.cursor()
         print("[DATABASE] Connexion à la base de données ouverte en " + env)
-        curseur.execute(requete_sql)
+        curseur.execute(requete_sql, data_sql)
         print("[DATABASE] Requête executée.")
         resultats = curseur.fetchall()
 
@@ -154,6 +154,14 @@ def get_directory_output(env):
 
 
 def get_file_output(store, type):
+    if type == 0:
+        resultat = (
+            "Resultat_KPUT_error_"
+            + str(store[0])
+            + "_"
+            + str(store[1])
+            + get_log_extention()
+        )
     if type == 1:
         resultat = (
             "Resultat_KPUT_3_columns_"
@@ -247,9 +255,12 @@ def worker(env, store, i, tabs_uri):
                 driver.get(domain + entity_uri)
                 time.sleep(0.8)
 
+                is_cms404 = True
                 is_3_columns = True
                 is_translucent = True
+                is_error = True
 
+                # PAGE LOADED
                 try:
                     WebDriverWait(driver, 10).until(
                         EC.presence_of_element_located((By.ID, "html-body"))
@@ -259,42 +270,69 @@ def worker(env, store, i, tabs_uri):
                         f"Process {num}_{name}_{i} : Une erreur sur {entity_id} - {e}"
                     )
 
+                # CMS 404 - not redirected
                 try:
-                    driver.find_element(
+                    cms404_text = driver.find_element(
                         By.CSS_SELECTOR,
-                        "body.catalog-product-view.page-layout-3columns",
-                    )
+                        "#maincontent div.column.main",
+                    ).text
+                    if cms404_text != "There was no 404 CMS page configured or found.":
+                        is_cms404 = False
                 except NoSuchElementException:
-                    is_3_columns = False
+                    is_cms404 = False
 
+                # 404 - redirected
                 try:
-                    imgs = driver.find_elements(
+                    error_text = driver.find_element(
                         By.CSS_SELECTOR,
-                        "#maincontent div.column.main div.product.media div.gallery-placeholder div.fotorama__stage__frame.fotorama_vertical_ratio.fotorama__loaded.fotorama__loaded--img",
-                    )
-                    tab_translucent = []
-                    for img in imgs:
-                        href = img.get_attribute("href")
-                        tab_translucent.append(
-                            has_transparent_background_from_url(href)
-                        )
-                    if all(not elem for elem in tab_translucent):
-                        is_translucent = False
-                except Exception as e:
-                    print(
-                        f"Process {num}_{name}_{i} : Une erreur sur {entity_id} - {e}"
-                    )
+                        "#maincontent div.column.main h1 span",
+                    ).text
+                    if error_text != "OUPS petite erreur 404":
+                        is_error = False
+                except NoSuchElementException:
+                    is_error = False
 
+                if is_cms404 == False or is_error == False:
+                    # 3 COLUMNS
+                    try:
+                        driver.find_element(
+                            By.CSS_SELECTOR,
+                            "body.catalog-product-view.page-layout-3columns",
+                        )
+                    except NoSuchElementException:
+                        is_3_columns = False
+                    # TRANSLUCENT
+                    try:
+                        imgs = driver.find_elements(
+                            By.CSS_SELECTOR,
+                            "#maincontent div.column.main div.product.media div.gallery-placeholder div.fotorama__stage__frame.fotorama_vertical_ratio.fotorama__loaded.fotorama__loaded--img",
+                        )
+                        tab_translucent = []
+                        for img in imgs:
+                            href = img.get_attribute("href")
+                            tab_translucent.append(
+                                has_transparent_background_from_url(href)
+                            )
+                        if all(not elem for elem in tab_translucent):
+                            is_translucent = False
+                    except NoSuchElementException:
+                        is_translucent = False
             except Exception as e:
                 print(f"Process {num}_{name}_{i} : Une erreur sur {entity_id} - {e}")
             finally:
-                if is_3_columns == False and is_translucent == False:
-                    print(
-                        f"Process {num}_{name}_{i} : "
-                        + str(entity_id)
-                        + " should be OK"
+                if is_cms404 == True or is_error == True:
+                    type_error = (
+                        "The product is KPUT, 404 (diabled, not visible, other)"
                     )
+                    is_output_for_store(env, store, 0)
+                    append_file(
+                        get_directory_output(env) + "/" + get_file_output(store, 0),
+                        [entity_id, type_error],
+                    )
+                    message = " should be KPUT by 404 (diabled, not visible, other)"
                 else:
+                    if is_3_columns == False and is_translucent == False:
+                        message = " should be OK"
                     if is_3_columns == True:
                         type_error = "The product has three columns"
                         is_output_for_store(env, store, 1)
@@ -302,7 +340,7 @@ def worker(env, store, i, tabs_uri):
                             get_directory_output(env) + "/" + get_file_output(store, 1),
                             [entity_id, type_error],
                         )
-                        error_message = " should be KPUT by 3 columns"
+                        message = " should be KPUT by 3 columns"
                     if is_translucent == True:
                         type_error = "The product has a translucent background image"
                         is_output_for_store(env, store, 2)
@@ -310,15 +348,10 @@ def worker(env, store, i, tabs_uri):
                             get_directory_output(env) + "/" + get_file_output(store, 2),
                             [entity_id, type_error],
                         )
-                        error_message = (
-                            " should be KPUT by translucent background image"
-                        )
-                    print(
-                        f"Process {num}_{name}_{i} : " + str(entity_id) + error_message
-                    )
+                        message = " should be KPUT by translucent image"
 
+                print(f"Process {num}_{name}_{i} : " + str(entity_id) + message)
                 update_log_by_store(env, store, uri)
-                exit
 
         driver.quit()
     except Exception as e:
